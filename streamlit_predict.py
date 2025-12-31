@@ -1,59 +1,50 @@
-# 第九章/streamlit_predict.py
+# 第八章/streamlit_predict.py
 import streamlit as st
 import pickle
 import pandas as pd
 
-# 运用表单和表单提交按钮
-with st.form('user_inputs'):
-    age = st.number_input('年龄', min_value=0)
-    sex = st.radio('性别', options=['男性', '女性'])
-    bmi = st.number_input('BMI', min_value=0.0)
+island = st.selectbox('企鹅栖息的岛屿', options=['托尔森岛', '比斯科群岛', '德里姆岛'])
+sex = st.selectbox('性别', options=['雄性', '雌性'])
 
-    children = st.number_input("子女数量: ", step=1, min_value=0)
-    smoke = st.radio("是否吸烟", ("是", "否"))
-    region = st.selectbox('区域', ('东南部', '西南部', '东北部', '西北部'))
-    submitted = st.form_submit_button('预测费用')
-if submitted:
-    format_data = [age, sex, bmi, bmi, children, smoke, region]
+bill_length = st.number_input('喙的长度（毫米）', min_value=0.0)
+bill_depth = st.number_input('喙的深度（毫米）', min_value=0.0)
+flipper_length = st.number_input('翅膀的长度（毫米）', min_value=0.0)
+body_mass = st.number_input('身体质量（克）', min_value=0.0)
 
-    # 初始化数据预处理格式中岛屿相关的变量
-    sex_female, sex_male = 0, 0
-    # 根据用户输入的性别数据，更改对应的值
-    if sex == '女性':
-        sex_female = 1
-    elif sex == '男性':
-        sex_male = 1
 
-    smoke_yes, smoke_no = 0, 0
-    # 根据用户输入的吸烟数据，更改对应的值
-    if smoke == '是':
-        smoke_yes = 1
-    elif smoke == '否':
-        smoke_no = 1
+# 初始化数据预处理格式中岛屿相关的变量
+island_biscoe, island_dream, island_torgerson = 0, 0, 0
+# 根据用户输入的岛屿数据，更改对应的值
+if island == '比斯科群岛':
+    island_biscoe = 1
+elif island == '德里姆岛':
+    island_dream = 1
+elif island == '托尔森岛':
+    island_torgerson = 1
 
-    region_northeast, region_southeast, region_northwest, region_southwest = 0, 0, 0, 0
-    # 根据用户输入的岛屿数据，更改对应的值
-    if region == '东北部':
-        region_northeast = 1
-    elif region == '东南部':
-        region_southeast = 1
-    elif region == '西北部':
-        region_northwest = 1
-    elif region == '西南部':
-        region_southwest = 1
+# 初始化数据预处理格式中性别相关的变量
+sex_female, sex_male = 0, 0
+# 根据用户输入的性别数据，更改对应的值
+if sex == '雄性':
+    sex_female = 1
+elif sex == '雌性':
+    sex_male = 1
 
-    format_data = [age, bmi, children, sex_female, sex_male,
-                   smoke_no, smoke_yes,
-                   region_northeast, region_southeast, region_northwest, region_southwest]
+format_data = [bill_length, bill_depth, flipper_length, body_mass,
+               island_dream, island_torgerson, island_biscoe, sex_female, sex_male]
 
-# 使用pickle的load方法从磁盘文件反序列化加载一个之前保存的随机森林回归模型
-with open('rfr_model.pkl', 'rb') as f:
-    rfr_model = pickle.load(f)
+# 使用pickle的load方法从磁盘文件反序列化加载一个之前保存的随机森林模型对象
+with open('rfc_model.pkl', 'rb') as f:
+    rfc_model = pickle.load(f)
 
-if submitted:
-    format_data_df = pd.DataFrame(data=[format_data], columns=rfr_model.feature_names_in_)
+# 使用pickle的load方法从磁盘文件反序列化加载一个之前保存的映射对象
+with open('output_uniques.pkl', 'rb') as f:
+    output_uniques_map = pickle.load(f)
 
-    # 使用模型对格式化后的数据format_data进行预测,返回预测的医疗费用
-    predict_result = rfr_model.predict(format_data_df)[0]
 
-    st.write('根据您输入的数据，预测该客户的医疗费用是：', round(predict_result, 2))
+# 使用模型对格式化后的数据format_data进行预测,返回预测的类别代码
+predict_result_code = rfc_model.predict([format_data])
+# 将类别代码映射到具体的类别名称
+predict_result_species = output_uniques_map[predict_result_code][0]
+
+st.write('根据您输入的数据，预测该企鹅的物种名称是：',predict_result_species)
