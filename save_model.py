@@ -1,56 +1,65 @@
-# 第八章/save_model.py
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import r2_score, mean_absolute_error
 from sklearn.model_selection import train_test_split
-import pickle  # 用来保存模型和output_uniques变量
+import pickle
+from joblib import dump  # 新增joblib导入
+import time
 
+# 1. 数据加载与预处理（完全保留你的逻辑）
+start_time = time.time()
+df = pd.read_csv(
+    'student_data_adjusted_rounded.csv',
+    encoding='utf-8-sig',
+    dtype={
+        '学号': str,          
+        '性别': 'category',  
+        '专业': 'category'
+    }
+)
+df.dropna(inplace=True)
+print(f"数据集形状：{df.shape}（耗时{time.time()-start_time:.2f}秒）")
+print("特征列：", df.columns.tolist())
 
-# 读取数据集，并指定字符编码为gbk，防止中文报错
-penguin_df = pd.read_csv('penguins-chinese.csv', encoding='gbk')
-# 删除缺失值所在的行
-penguin_df.dropna(inplace=True)
-# 定义企鹅的种类为目标输出变量
-output = penguin_df['企鹅的种类']
-# 将去除年份列不作为特征列
-# 使用企鹅栖息的岛屿、喙的长度、翅膀的长度、身体质量、性别作为特征列
-features = penguin_df[['企鹅栖息的岛屿', '喙的长度', '喙的深度', '翅膀的长度', '身体质量', '性别']]
-# 对特征列进行独热编码
-features = pd.get_dummies(features)
-# 将目标输出变量，进行转换为离散数值表示
-output_codes, output_uniques = pd.factorize(output)
+# 2. 定义特征和目标变量（完全保留）
+features = df[['性别', '专业', '每周学习时长（小时）', '上课出勤率', '期中考试分数', '作业完成率']]
+target = df['期末考试分数']
 
-# 从features和output_codes 这两个数组中划分数据集为训练集和测试集。
-# 训练集为80%，测试集为20%（1-80%）
-# 返回的x_train和 y_train为划分得到的训练集特征和标签。
-# x_test和y_test为划分得到的测试集特征和标签。
-# 这里标签和目标输出变量是一个意思
+# 3. 分类特征编码（完全保留）
+features_encoded = pd.get_dummies(features, drop_first=False)
+print("编码后的特征列数：", len(features_encoded.columns.tolist()))
 
-x_train, x_test, y_train, y_test = train_test_split(features, output_codes, train_size=0.8)
+# 4. 划分训练集（完全保留）
+x_train, x_test, y_train, y_test = train_test_split(
+    features_encoded, target, train_size=0.8, random_state=42, shuffle=True
+)
 
-# 构建一个随机森林分类器
-rfc = RandomForestClassifier()
+# 5. 模型训练（完全保留你的参数）
+rfr = RandomForestRegressor(
+    n_estimators=150,    
+    random_state=42,
+    n_jobs=-1,           
+    max_depth=12,        
+    min_samples_leaf=5   
+)
+train_start = time.time()
+rfr.fit(x_train, y_train)
+print(f"模型训练完成（耗时{time.time()-train_start:.2f}秒）")
 
-# 使用训练集数据x_train和y_train来拟合(训练)模型。
-rfc.fit(x_train, y_train)
+# 6. 模型评估（完全保留）
+y_pred = rfr.predict(x_test)
+print(f"模型评估结果：")
+print(f"决定系数（R²）：{r2_score(y_test, y_pred):.4f}")
+print(f"平均绝对误差（MAE）：{mean_absolute_error(y_test, y_pred):.2f}分")
 
-# 用训练好的模型rfc对测试集数据x_test进行预测，预测结果存储在y_pred中
-y_pred = rfc.predict(x_test)
+# 7. 保存模型（仅改模型为joblib保存，其余配置文件仍用pickle）
+dump(rfr, 'rfr_model.joblib', compress=3)  # 替换pickle.dump为joblib.dump（压缩减小体积）
+with open('feature_names.pkl', 'wb') as f:
+    pickle.dump(features_encoded.columns.tolist(), f)
+with open('unique_values.pkl', 'wb') as f:
+    pickle.dump({
+        '性别': df['性别'].unique().tolist(),
+        '专业': df['专业'].unique().tolist()
+    }, f)
 
-# 计算测试集上模型的预测准确率。
-# 方法是使用accuracy_score方法，比对真实标签y_test和预测标签y_pred
-# 返回预测正确的样本占全部样本的比例，即准确率。
-score = accuracy_score(y_pred, y_test)
-
-# 使用with语句，简化文件操作
-# open()函数和'wb'参数用于创建并写入字节流
-# pickle.dump()方法将模型对象转成字节流
-with open('rfc_model.pkl', 'wb') as f:
-    pickle.dump(rfc, f)
-
-# 同上
-# 将映射变量写入文件中
-with open('output_uniques.pkl', 'wb') as f:
-    pickle.dump(output_uniques, f)
-
-print('保存成功，已生成相关文件。')
+print(f"全部流程完成（总耗时{time.time()-start_time:.2f}秒）")
